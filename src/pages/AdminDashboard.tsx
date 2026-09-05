@@ -2,7 +2,9 @@ import React, { useState, useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import { PriorityBadge, SeverityBadge, StatusBadge } from "../components/StatusBadge";
 import { MapVisualization } from "../components/MapVisualization";
+import { HotspotMap } from "../components/dashboard/HotspotMap";
 import { InstitutionLogo } from "../components/InstitutionLogo";
+import { normalizeStatus } from "../utils/lifecycle";
 import { MUNICIPAL_WORKERS } from "../data/initialData";
 import { Complaint, ComplaintPriority, ComplaintStatus } from "../types";
 import {
@@ -41,6 +43,8 @@ import {
 export const AdminDashboard: React.FC = () => {
   const { 
     complaints, 
+    stats,
+    hotspots,
     auth, 
     viewComplaintDetails, 
     assignWorkerToComplaint,
@@ -54,6 +58,7 @@ export const AdminDashboard: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [zoneFilter, setZoneFilter] = useState("all");
+  const [geoViewTab, setGeoViewTab] = useState<"map" | "hotspots">("map");
 
   // Re-assignment modal state
   const [reassignModalComplaint, setReassignModalComplaint] = useState<Complaint | null>(null);
@@ -62,12 +67,18 @@ export const AdminDashboard: React.FC = () => {
   // Active chart view toggle
   const [timeRange, setTimeRange] = useState<"weekly" | "monthly">("weekly");
 
-  // 1. KPI Calculations
+  // 1. KPI Calculations using normalized statuses
   const totalComplaints = complaints.length;
-  const pendingCount = complaints.filter((c) => c.status === "REPORTED" || c.status === "ASSIGNED").length;
-  const inProgressCount = complaints.filter((c) => c.status === "IN PROGRESS" || c.status === "RESOLUTION SUBMITTED").length;
-  const resolvedCount = complaints.filter((c) => c.status === "RESOLVED").length;
-  const criticalCount = complaints.filter((c) => c.priority === "CRITICAL" && c.status !== "RESOLVED").length;
+  const pendingCount = complaints.filter((c) => {
+    const s = normalizeStatus(c.status);
+    return s === "REPORTED" || s === "ASSIGNED";
+  }).length;
+  const inProgressCount = complaints.filter((c) => {
+    const s = normalizeStatus(c.status);
+    return s === "IN_PROGRESS" || s === "RESOLUTION_SUBMITTED";
+  }).length;
+  const resolvedCount = complaints.filter((c) => normalizeStatus(c.status) === "RESOLVED").length;
+  const criticalCount = complaints.filter((c) => (c.priority || "").toUpperCase() === "CRITICAL" && normalizeStatus(c.status) !== "RESOLVED").length;
 
   // 2. Filtered complaints table
   const filteredComplaints = useMemo(() => {
@@ -79,8 +90,8 @@ export const AdminDashboard: React.FC = () => {
         c.location.ward.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.assignedWorker?.name || "").toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchStatus = statusFilter === "all" ? true : c.status === statusFilter;
-      const matchPriority = priorityFilter === "all" ? true : c.priority === priorityFilter;
+      const matchStatus = statusFilter === "all" ? true : normalizeStatus(c.status) === normalizeStatus(statusFilter);
+      const matchPriority = priorityFilter === "all" ? true : (c.priority || "").toUpperCase() === priorityFilter.toUpperCase();
       const matchCategory = categoryFilter === "all" ? true : c.category === categoryFilter;
       const matchZone = zoneFilter === "all" ? true : c.location.zone.includes(zoneFilter);
 
@@ -398,14 +409,62 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Map Section */}
-      <MapVisualization
-        complaints={complaints}
-        onSelectComplaint={(c) => viewComplaintDetails(c.id)}
-      />
+      {/* Geographic & Cleanliness Analytics Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <button
+              id="show-map-tab"
+              type="button"
+              onClick={() => setGeoViewTab("map")}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                geoViewTab === "map"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Incident Geolocation Map</span>
+            </button>
+            <button
+              id="show-hotspots-tab"
+              type="button"
+              onClick={() => setGeoViewTab("hotspots")}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                geoViewTab === "hotspots"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5 text-orange-600" />
+              <span>Civic Cleanliness Hotspot Matrix</span>
+            </button>
+          </div>
+          <span className="text-xs text-slate-500 hidden sm:inline">
+            Greater Visakhapatnam Municipal Corporation Wards
+          </span>
+        </div>
+
+        {geoViewTab === "map" ? (
+          <MapVisualization
+            complaints={complaints}
+            onSelectComplaint={(c) => viewComplaintDetails(c.id)}
+          />
+        ) : (
+          <HotspotMap
+            hotspots={hotspots}
+            onSelectWard={(ward) => {
+              setSearchQuery(ward);
+              // scroll smoothly down to table
+              const el = document.getElementById("complaints-directory-table");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+          />
+        )}
+      </div>
 
       {/* FULL COMPLAINTS MANAGEMENT TABLE */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div id="complaints-directory-table" className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Table Controls */}
         <div className="p-5 border-b border-slate-200 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -605,7 +664,7 @@ export const AdminDashboard: React.FC = () => {
                           <UserCheck className="w-3.5 h-3.5" />
                         </button>
 
-                        {item.status === "RESOLUTION SUBMITTED" && (
+                        {normalizeStatus(item.status) === "RESOLUTION_SUBMITTED" && (
                           <button
                             onClick={() => verifyComplaintResolution(item.id)}
                             title="Verify Resolution"

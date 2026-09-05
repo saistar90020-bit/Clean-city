@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { PriorityBadge, StatusBadge } from "../components/StatusBadge";
+import { normalizeStatus } from "../utils/lifecycle";
 import { 
   PlusCircle, 
   MapPin, 
@@ -28,11 +29,11 @@ export const CitizenDashboard: React.FC = () => {
   );
 
   const pendingCount = myComplaints.filter(
-    (c) => c.status !== "RESOLVED"
+    (c) => normalizeStatus(c.status) !== "RESOLVED"
   ).length;
 
   const resolvedCount = myComplaints.filter(
-    (c) => c.status === "RESOLVED"
+    (c) => normalizeStatus(c.status) === "RESOLVED"
   ).length;
 
   const totalCount = myComplaints.length;
@@ -44,12 +45,13 @@ export const CitizenDashboard: React.FC = () => {
       c.location.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.location.ward.toLowerCase().includes(searchTerm.toLowerCase());
 
+    const isResolved = normalizeStatus(c.status) === "RESOLVED";
     const matchesStatus =
       statusFilter === "all"
         ? true
         : statusFilter === "resolved"
-        ? c.status === "RESOLVED"
-        : c.status !== "RESOLVED";
+        ? isResolved
+        : !isResolved;
 
     return matchesSearch && matchesStatus;
   });

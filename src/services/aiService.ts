@@ -8,15 +8,16 @@ export interface AnalyzeComplaintParams {
 }
 
 /**
- * Intelligent Client-Side Rule Engine Fallback.
+ * Intelligent Client-Side Civic Rule Engine.
+ * Formulated under GVMC Solid Waste Bylaws and AP Municipal Sanitation Guidelines.
  * Used when backend AI endpoint is unavailable, network is offline,
- * or user has deployed to static hosting without API keys.
+ * or when Gemini API key is not configured.
  */
 export function performClientRuleAnalysis(description: string, location?: string): AIAnalysisResult {
   const text = (description || "").toLowerCase();
 
   let category = "Garbage Overflow";
-  let severity: ComplaintSeverity = "Medium";
+  let severity: ComplaintSeverity = "MEDIUM";
   let confidence = 0.88;
   let explanation = "Visual municipal waste accumulation identified requiring prompt civic sanitation intervention.";
   let recommendedAction = "Dispatch municipal collection vehicle with 2 sanitary workers within 12 hours.";
@@ -25,7 +26,7 @@ export function performClientRuleAnalysis(description: string, location?: string
 
   if (text.includes("fire") || text.includes("burn") || text.includes("smoke") || text.includes("flame")) {
     category = "Open Garbage Burning";
-    severity = "Critical";
+    severity = "CRITICAL";
     priority = "CRITICAL";
     confidence = 0.96;
     hazardousEscalationRequired = true;
@@ -33,7 +34,7 @@ export function performClientRuleAnalysis(description: string, location?: string
     recommendedAction = "Deploy municipal water bowser immediately to extinguish flames, notify local police beat for environmental violation challan.";
   } else if (text.includes("chemical") || text.includes("toxic") || text.includes("hospital") || text.includes("industrial") || text.includes("drum") || text.includes("sludge")) {
     category = "Illegal Hazardous Dumping";
-    severity = "Critical";
+    severity = "CRITICAL";
     priority = "CRITICAL";
     confidence = 0.95;
     hazardousEscalationRequired = true;
@@ -41,21 +42,21 @@ export function performClientRuleAnalysis(description: string, location?: string
     recommendedAction = "Escalate to GVMC Industrial Vigilance and notify Local Police Station for forensic inspection and vehicle seizure.";
   } else if (text.includes("drain") || text.includes("sewage") || text.includes("clog") || text.includes("waterlog") || text.includes("gutter") || text.includes("manhole") || text.includes("stagnant")) {
     category = "Blocked Storm Drain & Sewage";
-    severity = "High";
+    severity = "HIGH";
     priority = "HIGH";
     confidence = 0.93;
     explanation = "Severe stormwater drainage constriction with sewage backflow. Poses acute risk of urban waterlogging and mosquito-borne vector transmission.";
     recommendedAction = "Mobilize mechanical jetting-cum-suction tanker to de-silt drain line and apply anti-larval chemical spray.";
   } else if (text.includes("debris") || text.includes("construction") || text.includes("concrete") || text.includes("rubble") || text.includes("malba") || text.includes("brick") || text.includes("tiles")) {
     category = "Construction & Demolition Waste";
-    severity = "High";
+    severity = "HIGH";
     priority = "HIGH";
     confidence = 0.91;
     explanation = "Heavy construction debris dumped on public thoroughfare obstructing pedestrian walking and vehicular traffic flow.";
     recommendedAction = "Issue notice to contractor under GVMC Solid Waste Bylaws and assign hydraulic tipper truck for rubble lifting.";
   } else if (text.includes("dead animal") || text.includes("carcass") || text.includes("corpse") || text.includes("dog died")) {
     category = "Biohazard / Animal Carcass";
-    severity = "Critical";
+    severity = "CRITICAL";
     priority = "CRITICAL";
     confidence = 0.98;
     hazardousEscalationRequired = true;
@@ -63,7 +64,7 @@ export function performClientRuleAnalysis(description: string, location?: string
     recommendedAction = "Urgent dispatch of GVMC Veterinary dead-animal van with bio-protective containment and lime disinfectant.";
   } else if (text.includes("park") || text.includes("beach") || text.includes("wrapper") || text.includes("plastic") || text.includes("cup") || text.includes("litter")) {
     category = "Unclean Public Space";
-    severity = "Low";
+    severity = "LOW";
     priority = "LOW";
     confidence = 0.90;
     explanation = "Scattered non-biodegradable tourist/recreational litter along civic leisure amenity.";
@@ -71,7 +72,7 @@ export function performClientRuleAnalysis(description: string, location?: string
   } else {
     // Check overflow severity
     if (text.includes("overflow") || text.includes("huge") || text.includes("spill") || text.includes("dump") || text.includes("mountain") || text.includes("days")) {
-      severity = "High";
+      severity = "HIGH";
       priority = "HIGH";
       confidence = 0.94;
       explanation = "Overflowing community garbage container spilling across the roadway with high odor and stray animal scavenging.";
@@ -87,21 +88,21 @@ export function performClientRuleAnalysis(description: string, location?: string
     recommendedAction,
     priority,
     isAiGenerated: false,
-    engine: "CleanCity Intelligent Rule-Based Civic Engine v2.4 (GVMC Civic Bylaws)",
-    note: "Analysis completed via offline intelligent civic rules fallback.",
+    engine: "CleanCity Intelligent Civic Rule Engine v2.5",
+    note: "Civic audit calculated using offline intelligent rule engine (deterministic fallback).",
     hazardousEscalationRequired,
   };
 }
 
 /**
  * Main AI Complaint Analysis function.
- * Tries server-side Gemini Vision API first, then seamlessly falls back to
- * intelligent rule-based civic analysis.
+ * Tries server-side Gemini 3.8 Flash Vision API first, then gracefully falls back
+ * to the intelligent civic rule-based analysis.
  */
 export async function analyzeComplaint(params: AnalyzeComplaintParams): Promise<AIAnalysisResult> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 14000); // 14s timeout
 
     const response = await fetch("/api/analyze-complaint", {
       method: "POST",
@@ -114,22 +115,25 @@ export async function analyzeComplaint(params: AnalyzeComplaintParams): Promise<
 
     if (response.ok) {
       const data = await response.json();
+      const severity = ((data.severity || "MEDIUM") as string).toUpperCase() as ComplaintSeverity;
+      const priority = ((data.priority || severity) as string).toUpperCase() as ComplaintPriority;
+
       return {
         category: data.category || "Garbage Overflow",
-        severity: data.severity || "Medium",
-        confidence: typeof data.confidence === "number" ? data.confidence : 0.92,
+        severity,
+        priority,
+        confidence: typeof data.confidence === "number" ? data.confidence : 0.94,
         explanation: data.explanation || "Sanitation problem identified from image and description.",
         recommendedAction: data.recommendedAction || "Dispatch field worker for inspection and cleaning.",
-        priority: data.priority || (data.severity === "Critical" ? "CRITICAL" : data.severity === "High" ? "HIGH" : "MEDIUM"),
         isAiGenerated: Boolean(data.isAiGenerated),
-        engine: data.engine || (data.isAiGenerated ? "Google Gemini 2.5 Flash Vision" : "Intelligent Civic Engine"),
+        engine: data.engine || (data.isAiGenerated ? "Google Gemini 3.8 Flash Vision" : "CleanCity Civic Engine"),
         note: data.note,
         wardSuggestion: data.wardSuggestion,
         hazardousEscalationRequired: Boolean(data.hazardousEscalationRequired),
       };
     }
   } catch (err) {
-    console.warn("Server AI analysis call timed out or failed, utilizing intelligent client engine fallback:", err);
+    console.warn("Server AI analysis call timed out or failed, switching to intelligent client engine fallback:", err);
   }
 
   // Client-side intelligent fallback

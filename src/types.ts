@@ -11,16 +11,35 @@ export interface User {
   avatar?: string;
 }
 
-export type ComplaintSeverity = "Low" | "Medium" | "High" | "Critical";
+export type ComplaintSeverity = 
+  | "LOW" 
+  | "MEDIUM" 
+  | "HIGH" 
+  | "CRITICAL"
+  | "Low"
+  | "Medium"
+  | "High"
+  | "Critical";
+
 export type ComplaintPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-export type ComplaintStatus = 
+
+export type CanonicalComplaintStatus = 
   | "REPORTED"
-  | "AI ANALYZED"
+  | "AI_ANALYZED"
   | "ASSIGNED"
-  | "IN PROGRESS"
-  | "RESOLUTION SUBMITTED"
+  | "IN_PROGRESS"
+  | "RESOLUTION_SUBMITTED"
   | "VERIFIED"
-  | "RESOLVED";
+  | "RESOLVED"
+  | "REJECTED"
+  | "CANCELLED";
+
+export type LegacyComplaintStatus =
+  | "AI ANALYZED"
+  | "IN PROGRESS"
+  | "RESOLUTION SUBMITTED";
+
+export type ComplaintStatus = CanonicalComplaintStatus | LegacyComplaintStatus;
 
 export interface AIAnalysisResult {
   category: string;
@@ -62,6 +81,7 @@ export interface ResolutionData {
   workerName: string;
   verifiedAt?: string;
   verifiedBy?: string;
+  adminVerificationNotes?: string;
 }
 
 export interface Complaint {
@@ -82,6 +102,7 @@ export interface Complaint {
     name: string;
     phone: string;
     zone: string;
+    assignedAt?: string;
   };
   aiAnalysis: AIAnalysisResult;
   timeline: TimelineEntry[];
@@ -94,5 +115,34 @@ export interface FilterOptions {
   priority: string;
   category: string;
   zone: string;
+  ward?: string;
   dateRange: string;
+}
+
+export interface DashboardStatistics {
+  total: number;
+  reported: number;
+  assigned: number;
+  inProgress: number;
+  resolutionSubmitted: number;
+  resolved: number;
+  critical: number;
+  highPriority: number;
+  avgResolutionHours: number;
+  categoryDistribution: { category: string; count: number; percentage: number }[];
+  zoneDistribution: { zone: string; count: number; resolved: number }[];
+  severityDistribution: { severity: string; count: number }[];
+}
+
+export interface HotspotData {
+  ward: string;
+  zone: string;
+  totalComplaints: number;
+  activeComplaints: number;
+  criticalComplaints: number;
+  dominantCategory: string;
+  cleanlinessScore: number; // 0 to 100 (100 = perfectly clean)
+  riskLevel: "Low" | "Moderate" | "Severe" | "Critical";
+  lat: number;
+  lng: number;
 }

@@ -2,6 +2,7 @@ import React from "react";
 import { useApp } from "../context/AppContext";
 import { PriorityBadge, SeverityBadge, StatusBadge } from "../components/StatusBadge";
 import { InstitutionLogo } from "../components/InstitutionLogo";
+import { normalizeStatus } from "../utils/lifecycle";
 import { 
   ArrowLeft, 
   MapPin, 
@@ -195,7 +196,7 @@ export const ComplaintDetailPage: React.FC = () => {
                 </p>
 
                 {/* Admin Verification Action if pending verification */}
-                {isAdmin && complaint.status === "RESOLUTION SUBMITTED" && (
+                {isAdmin && normalizeStatus(complaint.status) === "RESOLUTION_SUBMITTED" && (
                   <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center justify-between">
                     <span className="text-xs text-emerald-900 font-semibold">
                       Requires Municipal Commissioner Sign-Off:

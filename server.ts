@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const app = express();
 const PORT = 3000;
@@ -9,66 +9,72 @@ const PORT = 3000;
 app.use(express.json({ limit: "15mb" }));
 
 // Helper for rule-based analysis fallback
-function performRuleBasedAnalysis(description: string, categoryHint?: string) {
+function performRuleBasedAnalysis(description: string, locationHint?: string) {
   const text = (description || "").toLowerCase();
 
   let category = "Garbage Overflow";
-  let severity: "Low" | "Medium" | "High" | "Critical" = "Medium";
+  let severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "MEDIUM";
   let confidence = 0.88;
-  let explanation = "Visual waste accumulation detected requiring standard municipal sanitation intervention.";
+  let explanation = "Visual municipal waste accumulation detected requiring prompt civic sanitation intervention.";
   let recommendedAction = "Dispatch municipal cleaning team with pickup vehicle within 12 hours.";
+  let priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "MEDIUM";
+  let hazardousEscalationRequired = false;
 
   if (text.includes("fire") || text.includes("burn") || text.includes("smoke") || text.includes("flame")) {
     category = "Open Garbage Burning";
-    severity = "Critical";
+    severity = "CRITICAL";
+    priority = "CRITICAL";
     confidence = 0.95;
-    explanation = "Combustion of municipal solid waste releases toxic dioxins and particulate matter. Immediate public hazard.";
+    hazardousEscalationRequired = true;
+    explanation = "Combustion of municipal solid waste releases toxic dioxins and particulate matter. Immediate public respiratory hazard.";
     recommendedAction = "Alert fire department / emergency sanitation team immediately and extinguish open burn.";
-  } else if (text.includes("drain") || text.includes("sewage") || text.includes("clog") || text.includes("waterlog") || text.includes("gutter") || text.includes("stagnant")) {
+  } else if (text.includes("drain") || text.includes("sewage") || text.includes("clog") || text.includes("waterlog") || text.includes("gutter") || text.includes("stagnant") || text.includes("manhole")) {
     category = "Blocked Storm Drain & Sewage";
-    severity = "High";
-    confidence = 0.92;
-    explanation = "Severe blockage in drainage network causing sewage overflow and potential disease vector breeding.";
+    severity = "HIGH";
+    priority = "HIGH";
+    confidence = 0.93;
+    explanation = "Severe blockage in stormwater drainage network causing sewage overflow and potential disease vector breeding.";
     recommendedAction = "Deploy desilting suction truck and clearance crew to clear obstruction.";
   } else if (text.includes("debris") || text.includes("construction") || text.includes("concrete") || text.includes("rubble") || text.includes("malba") || text.includes("brick")) {
     category = "Construction & Demolition Waste";
-    severity = "Medium";
-    confidence = 0.90;
-    explanation = "Illegal dumping of construction malba blocking pedestrian footpath and road shoulder.";
+    severity = "HIGH";
+    priority = "HIGH";
+    confidence = 0.91;
+    explanation = "Illegal dumping of construction malba blocking pedestrian footpath and vehicular road shoulder.";
     recommendedAction = "Issue notice to contractor and dispatch hydraulic dumper for heavy debris removal.";
-  } else if (text.includes("illegal") || text.includes("night") || text.includes("truck") || text.includes("toxic") || text.includes("hazard") || text.includes("hospital") || text.includes("chemical")) {
+  } else if (text.includes("illegal") || text.includes("chemical") || text.includes("toxic") || text.includes("hazard") || text.includes("hospital") || text.includes("sludge") || text.includes("drums")) {
     category = "Illegal Hazardous Dumping";
-    severity = "Critical";
+    severity = "CRITICAL";
+    priority = "CRITICAL";
     confidence = 0.96;
-    explanation = "Unauthorized dumping of restricted industrial/bio-medical or mass illegal commercial waste.";
-    recommendedAction = "Escalate to GVMC Enforcement Wing and local Police Station for CCTV inspection and FIR.";
+    hazardousEscalationRequired = true;
+    explanation = "Unauthorized dumping of restricted industrial, bio-medical, or mass hazardous commercial waste.";
+    recommendedAction = "Escalate to GVMC Enforcement Wing and local Police Station for CCTV inspection and vehicle seizure.";
   } else if (text.includes("park") || text.includes("beach") || text.includes("plastic") || text.includes("litter") || text.includes("bottle") || text.includes("wrapper")) {
     category = "Unclean Public Space";
-    severity = "Low";
+    severity = "LOW";
+    priority = "LOW";
     confidence = 0.89;
     explanation = "Scattered non-biodegradable plastics and dry litter in a public recreational space.";
     recommendedAction = "Assign designated sweepers for manual collection and segregated bin placement.";
-  } else if (text.includes("dead animal") || text.includes("carcass") || text.includes("stench") || text.includes("smell")) {
+  } else if (text.includes("dead animal") || text.includes("carcass") || text.includes("stench") || text.includes("dog died")) {
     category = "Biohazard / Animal Carcass";
-    severity = "Critical";
-    confidence = 0.97;
-    explanation = "Biological hazard creating acute public health emergency and severe foul odor.";
+    severity = "CRITICAL";
+    priority = "CRITICAL";
+    confidence = 0.98;
+    hazardousEscalationRequired = true;
+    explanation = "Biological hazard creating acute public health emergency, disease vectors, and severe foul odor.";
     recommendedAction = "Deploy specialized veterinary bio-containment vehicle within 2 hours.";
   } else {
     // Default garbage overflow
-    if (text.includes("overflow") || text.includes("spill") || text.includes("huge") || text.includes("pile") || text.includes("mountain")) {
-      severity = "High";
+    if (text.includes("overflow") || text.includes("spill") || text.includes("huge") || text.includes("pile") || text.includes("mountain") || text.includes("days")) {
+      severity = "HIGH";
+      priority = "HIGH";
       confidence = 0.94;
       explanation = "Massive overflow exceeding bin capacity, encroaching onto public thoroughfare.";
       recommendedAction = "Dispatch compactor truck for urgent bulk container clearance.";
     }
   }
-
-  // Priority formula
-  let priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "MEDIUM";
-  if (severity === "Critical") priority = "CRITICAL";
-  else if (severity === "High") priority = "HIGH";
-  else if (severity === "Low") priority = "LOW";
 
   return {
     category,
@@ -78,7 +84,8 @@ function performRuleBasedAnalysis(description: string, categoryHint?: string) {
     recommendedAction,
     priority,
     isAiGenerated: false,
-    engine: "CleanCity Intelligent Rule-Based Engine v2.4 (GVMC Civic Rules)"
+    engine: "CleanCity Intelligent Rule-Based Civic Engine v2.5",
+    hazardousEscalationRequired,
   };
 }
 
@@ -88,88 +95,133 @@ app.get("/api/health", (_req, res) => {
     status: "ok",
     service: "CleanCity Civic AI API",
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
 // AI Complaint Analysis endpoint
 app.post("/api/analyze-complaint", async (req, res) => {
   const { imageBase64, mimeType, description, location } = req.body;
-
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    // Graceful fallback to rule-based analysis
-    const result = performRuleBasedAnalysis(description || "");
+    const result = performRuleBasedAnalysis(description || "", location);
     return res.json({
       ...result,
-      note: "Analyzed using CleanCity Intelligent Civic Rule Engine (Gemini API key not configured in environment)."
+      note: "AI analysis completed via CleanCity Intelligent Civic Rule Engine (Gemini API key not configured in environment).",
     });
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
 
-    const prompt = `You are the AI Sanitation Inspector for CleanCity, a platform operating in Greater Visakhapatnam Municipal Corporation (GVMC) in partnership with SITAM.
-Analyze this sanitation complaint.
-Location provided: "${location || "Not specified"}"
-Citizen complaint text: "${description || "No description provided"}"
+    const promptText = `You are the Lead AI Municipal Sanitation Inspector for CleanCity, operating for Greater Visakhapatnam Municipal Corporation (GVMC) in partnership with SITAM.
+Analyze this civic sanitation report.
+Location reported: "${location || "Unspecified Visakhapatnam"}"
+Citizen text description: "${description || "Visual complaint image attached"}"
 
-Respond with ONLY a valid JSON object (no markdown, no backticks, no extra text) with these exact keys:
-{
-  "category": "One of: Garbage Overflow, Illegal Dumping, Open Garbage Burning, Blocked Storm Drain & Sewage, Construction & Demolition Waste, Unclean Public Space, Biohazard / Animal Carcass",
-  "severity": "One of: Low, Medium, High, Critical",
-  "confidence": 0.85 to 0.99,
-  "explanation": "2-3 concise sentences detailing what sanitation issue is identified and its environmental/public health impact",
-  "recommendedAction": "1-2 actionable instructions for the GVMC field worker and sanitation supervisor",
-  "priority": "One of: LOW, MEDIUM, HIGH, CRITICAL",
-  "wardSuggestion": "Suggested GVMC Ward/Zone (e.g. Zone 2 - MVP Colony or Zone 1 - Dwaraka Nagar)",
-  "hazardousEscalationRequired": true or false
-}`;
+Perform a thorough sanitation audit:
+1. Identify the exact civic category.
+2. Determine severity level: LOW, MEDIUM, HIGH, or CRITICAL.
+3. Determine priority level: LOW, MEDIUM, HIGH, or CRITICAL.
+4. Estimate diagnostic confidence score between 0.85 and 0.99.
+5. Provide a 2-3 sentence objective explanation of the civic issue, public hazard, or environmental impact.
+6. Provide specific, actionable recommendation for GVMC sanitary field workers and zonal dispatchers.
+7. Flag if hazardous escalation (police/fire/health vigilance) is required.
+8. Suggest appropriate GVMC ward/zone if determinable.`;
 
-    const contents: any[] = [];
+    const parts: any[] = [];
 
     if (imageBase64) {
-      // Remove data url header if present
       const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
-      contents.push({
+      parts.push({
         inlineData: {
           mimeType: mimeType || "image/jpeg",
-          data: cleanBase64
-        }
+          data: cleanBase64,
+        },
       });
     }
 
-    contents.push({ text: prompt });
+    parts.push({ text: promptText });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents
+      model: "gemini-3.8-flash",
+      contents: { parts },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            category: {
+              type: Type.STRING,
+              description: "Sanitation category, e.g., Garbage Overflow, Illegal Hazardous Dumping, Open Garbage Burning, Blocked Storm Drain & Sewage, Construction & Demolition Waste, Unclean Public Space, Biohazard / Animal Carcass",
+            },
+            severity: {
+              type: Type.STRING,
+              description: "One of: LOW, MEDIUM, HIGH, CRITICAL",
+            },
+            priority: {
+              type: Type.STRING,
+              description: "One of: LOW, MEDIUM, HIGH, CRITICAL",
+            },
+            confidence: {
+              type: Type.NUMBER,
+              description: "Confidence rating between 0.85 and 0.99",
+            },
+            explanation: {
+              type: Type.STRING,
+              description: "2-3 concise sentences detailing what sanitation issue is identified and its environmental/public health impact",
+            },
+            recommendedAction: {
+              type: Type.STRING,
+              description: "Actionable instructions for the GVMC field worker and sanitation supervisor",
+            },
+            wardSuggestion: {
+              type: Type.STRING,
+              description: "Suggested GVMC Ward/Zone",
+            },
+            hazardousEscalationRequired: {
+              type: Type.BOOLEAN,
+              description: "Whether immediate police, fire, or veterinary escalation is needed",
+            },
+          },
+          required: ["category", "severity", "confidence", "explanation", "recommendedAction", "priority"],
+        },
+      },
     });
 
     const rawText = response.text || "";
-    // Clean potential markdown blocks
-    const cleanedJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(cleanedJsonText);
+    const parsed = JSON.parse(rawText.trim());
+
+    // Normalize severity & priority to uppercase
+    const severity = (parsed.severity || "MEDIUM").toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+    const priority = (parsed.priority || severity).toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
     return res.json({
       category: parsed.category || "Garbage Overflow",
-      severity: parsed.severity || "High",
+      severity,
+      priority,
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.94,
-      explanation: parsed.explanation || "Identified waste accumulation requiring prompt municipal action.",
+      explanation: parsed.explanation || "Municipal waste accumulation identified requiring prompt civic sanitation intervention.",
       recommendedAction: parsed.recommendedAction || "Dispatch sanitation field crew for collection.",
-      priority: parsed.priority || (parsed.severity === "Critical" ? "CRITICAL" : parsed.severity === "High" ? "HIGH" : "MEDIUM"),
       wardSuggestion: parsed.wardSuggestion,
       hazardousEscalationRequired: Boolean(parsed.hazardousEscalationRequired),
       isAiGenerated: true,
-      engine: "Google Gemini 2.5 Flash Multimodal Vision"
+      engine: "Google Gemini 3.8 Flash Vision",
     });
   } catch (error: any) {
-    console.error("Gemini API analysis failed, falling back to rule-based engine:", error?.message);
-    const fallback = performRuleBasedAnalysis(description || "");
+    console.error("Gemini API call failed, switching to intelligent civic rule engine fallback:", error?.message);
+    const fallback = performRuleBasedAnalysis(description || "", location);
     return res.json({
       ...fallback,
-      note: "Analyzed using CleanCity Intelligent Civic Rule Engine (Gemini fallback)."
+      note: "AI analysis completed via CleanCity Intelligent Civic Rule Engine (Gemini fallback).",
     });
   }
 });

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { PriorityBadge, StatusBadge } from "../components/StatusBadge";
 import { Complaint, ComplaintStatus } from "../types";
+import { normalizeStatus } from "../utils/lifecycle";
 import { 
   HardHat, 
   MapPin, 
@@ -62,8 +63,14 @@ export const WorkerDashboard: React.FC = () => {
       c.location.zone.toLowerCase().includes(workerZone.toLowerCase().slice(0, 6))
   );
 
-  const pendingTasks = assignedTasks.filter((t) => t.status !== "RESOLVED" && t.status !== "RESOLUTION SUBMITTED");
-  const completedTasks = assignedTasks.filter((t) => t.status === "RESOLVED" || t.status === "RESOLUTION SUBMITTED");
+  const pendingTasks = assignedTasks.filter((t) => {
+    const s = normalizeStatus(t.status);
+    return s !== "RESOLVED" && s !== "RESOLUTION_SUBMITTED";
+  });
+  const completedTasks = assignedTasks.filter((t) => {
+    const s = normalizeStatus(t.status);
+    return s === "RESOLVED" || s === "RESOLUTION_SUBMITTED";
+  });
 
   const highPriorityCount = pendingTasks.filter((t) => t.priority === "HIGH" || t.priority === "CRITICAL").length;
 
@@ -283,7 +290,7 @@ export const WorkerDashboard: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {task.status === "REPORTED" && (
+                    {normalizeStatus(task.status) === "REPORTED" && (
                       <button
                         onClick={() => handleAcceptTask(task)}
                         className="py-1.5 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
@@ -292,7 +299,7 @@ export const WorkerDashboard: React.FC = () => {
                       </button>
                     )}
 
-                    {task.status === "ASSIGNED" && (
+                    {normalizeStatus(task.status) === "ASSIGNED" && (
                       <button
                         onClick={() => handleStartWork(task)}
                         className="py-1.5 px-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
@@ -302,7 +309,7 @@ export const WorkerDashboard: React.FC = () => {
                       </button>
                     )}
 
-                    {task.status === "IN PROGRESS" && (
+                    {normalizeStatus(task.status) === "IN_PROGRESS" && (
                       <button
                         onClick={() => handleOpenResolutionModal(task)}
                         className="py-1.5 px-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
@@ -312,7 +319,7 @@ export const WorkerDashboard: React.FC = () => {
                       </button>
                     )}
 
-                    {(task.status === "RESOLUTION SUBMITTED" || task.status === "RESOLVED") && (
+                    {(normalizeStatus(task.status) === "RESOLUTION_SUBMITTED" || normalizeStatus(task.status) === "RESOLVED") && (
                       <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Work Proof Submitted</span>
